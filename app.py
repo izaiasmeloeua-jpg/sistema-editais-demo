@@ -1,99 +1,62 @@
-const express = require("express");
-const multer = require("multer");
-const cors = require("cors");
+import streamlit as st
+import requests
 
-const app = express();
+st.set_page_config(page_title="Sistema IA de Análise de Editais", layout="wide")
 
-app.use(cors());
-app.use(express.json());
+st.title("Sistema IA de Análise de Editais")
+st.markdown("Envie os documentos do edital para análise completa.")
 
-// =========================
-// CONFIG MULTER (MEMÓRIA)
-// =========================
-const storage = multer.memoryStorage();
+# =========================
+# UPLOADS
+# =========================
+edital_file = st.file_uploader("1️⃣ Edital Principal (PDF)", type=["pdf"])
+tr_file = st.file_uploader("2️⃣ Termo de Referência (PDF)", type=["pdf"])
+documentos_complementares = st.file_uploader(
+    "3️⃣ Documentos Complementares (opcional)",
+    type=["pdf"],
+    accept_multiple_files=True
+)
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB por arquivo
-});
+# =========================
+# BOTÃO
+# =========================
+if st.button("Analisar edital"):
 
-// =========================
-// ROTA TESTE
-// =========================
-app.get("/", (req, res) => {
-  res.json({
-    status: "ok",
-    message: "API rodando 🚀"
-  });
-});
+    if not edital_file or not tr_file:
+        st.error("Envie o Edital e o Termo de Referência.")
+        st.stop()
 
-// =========================
-// ROTA UPLOAD (MULTI)
-// =========================
-app.post("/upload", upload.array("file", 50), async (req, res) => {
-  try {
-    const arquivos = req.files;
+    # =========================
+    # MONTA MULTIPART
+    # =========================
+    files = []
 
-    if (!arquivos || arquivos.length === 0) {
-      return res.status(400).json({
-        erro: "Nenhum arquivo enviado"
-      });
-    }
+    files.append(("file", (edital_file.name, edital_file, "application/pdf")))
+    files.append(("file", (tr_file.name, tr_file, "application/pdf")))
 
-    console.log("Arquivos recebidos:");
-    arquivos.forEach((f, i) => {
-      console.log(`${i + 1} - ${f.originalname}`);
-    });
+    if documentos_complementares:
+        for doc in documentos_complementares:
+            files.append(("file", (doc.name, doc, "application/pdf")))
 
-    // =========================
-    // IDENTIFICAÇÃO SIMPLES
-    // =========================
-    let edital = null;
-    let tr = null;
-    let anexos = [];
+    # =========================
+    # BACKEND
+    # =========================
+    url = "https://automacao-p1-295355359739.southamerica-east1.run.app/upload"
 
-    arquivos.forEach(file => {
-      const nome = file.originalname.toLowerCase();
+    with st.spinner("Processando análise..."):
+        try:
+            response = requests.post(url, files=files)
 
-      if (nome.includes("edital") && !edital) {
-        edital = file;
-      } else if (
-        nome.includes("termo") ||
-        nome.includes("referencia") ||
-        nome.includes("tr")
-      ) {
-        tr = file;
-      } else {
-        anexos.push(file);
-      }
-    });
+            try:
+                data = response.json()
+            except:
+                data = response.text
 
-    // =========================
-    // RESPOSTA
-    // =========================
-    return res.json({
-      status: "ok",
-      total_arquivos: arquivos.length,
-      edital: edital ? edital.originalname : null,
-      termo_referencia: tr ? tr.originalname : null,
-      anexos: anexos.map(a => a.originalname)
-    });
+            if response.status_code == 200:
+                st.success("Análise concluída com sucesso")
+                st.write(data)
+            else:
+                st.error(f"Erro no backend:\n{data}")
 
-  } catch (error) {
-    console.error("Erro no upload:", error);
-
-    return res.status(500).json({
-      erro: "Erro interno",
-      detalhe: error.message
-    });
-  }
-});
-
-// =========================
-// PORTA
-// =========================
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+        except Exception as e:
+            st.error(f"Erro ao conectar com backend: {e}")
