@@ -1,45 +1,59 @@
 import streamlit as st
 import requests
 
-# URL do seu sistema (Cloud Run)
-API_URL = "https://automacao-p1-gmld6pkskq-rj.a.run.app"
+API_URL = "https://automacao-p1-295355359739.southamerica-east1.run.app"
 
 st.set_page_config(page_title="Sistema IA de Editais", layout="wide")
 
 st.title("📄 Sistema IA de Análise de Editais")
+st.markdown("Envie os documentos do edital para análise completa.")
 
-st.markdown("Envie um edital em PDF e obtenha análise automática com score e recomendação estratégica.")
+edital_file = st.file_uploader("1️⃣ Edital Principal (PDF)", type=["pdf"])
+tr_file = st.file_uploader("2️⃣ Termo de Referência (PDF)", type=["pdf"])
+anexos_files = st.file_uploader("3️⃣ Anexos (opcional)", type=["pdf"], accept_multiple_files=True)
 
-uploaded_file = st.file_uploader("📎 Enviar edital (PDF)", type=["pdf"])
+if st.button("🚀 Analisar edital"):
+    if not edital_file or not tr_file:
+        st.error("Envie pelo menos o Edital e o Termo de Referência.")
+    else:
+        st.info("Processando...")
 
-if uploaded_file:
-    st.success("Arquivo carregado com sucesso!")
+        files_to_send = [edital_file, tr_file]
+        if anexos_files:
+            files_to_send.extend(anexos_files)
 
-    if st.button("🚀 Analisar edital"):
-        with st.spinner("Processando edital..."):
-            
-            # Upload do arquivo
-            files = {"file": uploaded_file.getvalue()}
-            response_upload = requests.post(f"{API_URL}/upload", files=files)
+        edital_id = None
 
-            if response_upload.status_code != 200:
-                st.error("Erro no upload do edital.")
-            else:
-                data = response_upload.json()
-                edital_id = data.get("edital_id")
+        for f in files_to_send:
+            response = requests.post(
+                f"{API_URL}/upload",
+                files={"file": (f.name, f, "application/pdf")}
+            )
 
-                st.info(f"Edital processado: {edital_id}")
+            if response.status_code != 200:
+                st.error(f"Erro ao enviar {f.name}")
+                st.stop()
 
-                # Gerar relatório
-                response_relatorio = requests.get(f"{API_URL}/relatorio/{edital_id}")
+            data = response.json()
+            edital_id = data.get("editalId")
 
-                if response_relatorio.status_code == 200:
-                    st.subheader("📊 Resultado da Análise")
-                    st.text(response_relatorio.text)
+        if not edital_id:
+            st.error("Não foi possível obter o ID do edital.")
+            st.stop()
 
-                    # Botão para exportar Excel
-                    excel_url = f"{API_URL}/export/score/{edital_id}"
-                    st.markdown(f"[📥 Baixar Excel]({excel_url})")
+        for ep in ["itens", "regras", "match", "score"]:
+            r = requests.post(f"{API_URL}/{ep}/{edital_id}")
+            if r.status_code != 200:
+                st.error(f"Erro na etapa: {ep}")
+                st.stop()
 
-                else:
-                    st.error("Erro ao gerar relatório.")
+        rel = requests.get(f"{API_URL}/relatorio/{edital_id}")
+
+        if rel.status_code == 200:
+            st.success("Análise concluída!")
+            st.text(rel.text)
+
+            excel_url = f"{API_URL}/export/score/{edital_id}"
+            st.markdown(f"[📥 Baixar Excel]({excel_url})")
+        else:
+            st.error("Erro ao gerar relatório.")
