@@ -27,40 +27,45 @@ if st.button("🚀 Analisar edital"):
         st.stop()
 
     # =========================
-    # MONTAR MULTIPART
+    # MONTAR MULTIPART CORRETO
     # =========================
     files = []
 
     # edital
-    files.append(("files", (edital_file.name, edital_file, "application/pdf")))
+    files.append(("file", (edital_file.name, edital_file, "application/pdf")))
 
     # TR
-    files.append(("files", (tr_file.name, tr_file, "application/pdf")))
+    files.append(("file", (tr_file.name, tr_file, "application/pdf")))
 
     # complementares
     if documentos_complementares:
         for doc in documentos_complementares:
-            files.append(("files", (doc.name, doc, "application/pdf")))
+            files.append(("file", (doc.name, doc, "application/pdf")))
 
     # =========================
-    # CHAMADA BACKEND
+    # URL DO BACKEND
     # =========================
     url = "https://automacao-p1-295355359739.southamerica-east1.run.app/upload"
 
+    # =========================
+    # CHAMADA
+    # =========================
     with st.spinner("Processando análise..."):
         try:
             response = requests.post(url, files=files)
 
-            if response.status_code == 200:
+            # tenta json
+            try:
                 data = response.json()
+            except:
+                data = response.text
 
+            if response.status_code == 200:
                 st.success("Análise concluída com sucesso!")
-
                 st.markdown("## 📊 Resultado da Análise")
-                st.json(data)
-
+                st.write(data)
             else:
-                st.error(f"Erro no backend: {response.text}")
+                st.error(f"Erro no backend:\n{data}")
 
         except Exception as e:
             st.error(f"Erro ao conectar com backend: {e}")
