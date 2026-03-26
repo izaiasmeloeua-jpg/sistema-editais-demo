@@ -1,93 +1,88 @@
 import streamlit as st
+import requests
 
 st.set_page_config(page_title="Sistema IA de Editais", layout="wide")
 
 st.title("📊 Sistema IA de Análise de Editais")
 st.write("Envie os documentos do edital para análise completa.")
 
-# 1. EDITAL
-st.subheader("1️⃣ Edital (PDF) *obrigatório*")
-edital = st.file_uploader(
-    "Arraste ou selecione o EDITAL",
-    type=["pdf"],
-    key="edital"
-)
+# =========================
+# UPLOADS
+# =========================
 
-# 2. TERMO DE REFERÊNCIA
-st.subheader("2️⃣ Termo de Referência (PDF) *obrigatório*")
-tr = st.file_uploader(
-    "Arraste ou selecione o TERMO DE REFERÊNCIA",
-    type=["pdf"],
-    key="tr"
-)
+st.subheader("📄 1. Edital (PDF) *obrigatório*")
+edital = st.file_uploader("Arraste ou selecione o EDITAL", type=["pdf"], key="edital")
 
-# 3. PONTUAÇÃO TÉCNICA
-st.subheader("3️⃣ Pontuação Técnica (PDF)")
-pontuacao = st.file_uploader(
-    "Arraste ou selecione documento de PONTUAÇÃO",
-    type=["pdf"],
-    key="pontuacao"
-)
+st.subheader("📑 2. Termo de Referência (PDF) *obrigatório*")
+tr = st.file_uploader("Arraste ou selecione o TR", type=["pdf"], key="tr")
 
-# 4. ESCOPO / PROJETO
-st.subheader("4️⃣ Escopo / Projeto (PDF)")
-escopo = st.file_uploader(
-    "Arraste ou selecione o ESCOPO",
-    type=["pdf"],
-    key="escopo"
-)
+st.subheader("📊 3. Escopo / Projeto")
+escopo = st.file_uploader("Opcional", type=["pdf"], key="escopo")
 
-# 5. MEMORIAL / ETP
-st.subheader("5️⃣ Memorial / ETP (PDF)")
-etp = st.file_uploader(
-    "Arraste ou selecione o ETP ou MEMORIAL",
-    type=["pdf"],
-    key="etp"
-)
+st.subheader("📈 4. Cronograma")
+cronograma = st.file_uploader("Opcional", type=["pdf"], key="cronograma")
 
-# 6. PLANILHAS / ORÇAMENTO
-st.subheader("6️⃣ Planilhas / Orçamento (PDF ou Excel)")
-orcamento = st.file_uploader(
-    "Arraste ou selecione PLANILHAS",
-    type=["pdf", "xlsx", "xls"],
-    key="orcamento"
-)
+st.subheader("💰 5. Orçamento")
+orcamento = st.file_uploader("Opcional", type=["pdf"], key="orcamento")
 
-# 7. CRONOGRAMA
-st.subheader("7️⃣ Cronograma (PDF)")
-cronograma = st.file_uploader(
-    "Arraste ou selecione o CRONOGRAMA",
-    type=["pdf"],
-    key="cronograma"
-)
+st.subheader("📚 6. ETP / Estudos Técnicos")
+etp = st.file_uploader("Opcional", type=["pdf"], key="etp")
 
-# 8. OUTROS ANEXOS
-st.subheader("8️⃣ Outros Anexos")
-outros = st.file_uploader(
-    "Arraste ou selecione outros documentos",
-    type=["pdf"],
-    accept_multiple_files=True,
-    key="outros"
-)
+st.subheader("📊 7. Planilha / Memória de Cálculo")
+memoria = st.file_uploader("Opcional", type=["pdf"], key="memoria")
 
-st.markdown("---")
+
+# =========================
+# BOTÃO PRINCIPAL
+# =========================
 
 if st.button("🚀 Analisar edital"):
+
     if not edital or not tr:
         st.error("Envie pelo menos o EDITAL e o TERMO DE REFERÊNCIA.")
     else:
-        st.success("Arquivos recebidos com sucesso!")
+        with st.spinner("Processando documentos..."):
 
-        st.write("### 📂 Arquivos enviados:")
-        st.write("Edital:", edital.name if edital else None)
-        st.write("TR:", tr.name if tr else None)
-        st.write("Pontuação:", pontuacao.name if pontuacao else None)
-        st.write("Escopo:", escopo.name if escopo else None)
-        st.write("ETP:", etp.name if etp else None)
-        st.write("Orçamento:", orcamento.name if orcamento else None)
-        st.write("Cronograma:", cronograma.name if cronograma else None)
+            files = []
 
-        if outros:
-            st.write("Outros anexos:")
-            for f in outros:
-                st.write("-", f.name)
+            # obrigatórios
+            files.append(("file", (edital.name, edital, "application/pdf")))
+            files.append(("file", (tr.name, tr, "application/pdf")))
+
+            # opcionais
+            if escopo:
+                files.append(("file", (escopo.name, escopo, "application/pdf")))
+
+            if cronograma:
+                files.append(("file", (cronograma.name, cronograma, "application/pdf")))
+
+            if orcamento:
+                files.append(("file", (orcamento.name, orcamento, "application/pdf")))
+
+            if etp:
+                files.append(("file", (etp.name, etp, "application/pdf")))
+
+            if memoria:
+                files.append(("file", (memoria.name, memoria, "application/pdf")))
+
+            try:
+                response = requests.post(
+                    "https://automacao-p1-295355359739.southamerica-east1.run.app/upload",
+                    files=files,
+                    timeout=300
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+
+                    st.success("✅ Upload e processamento concluídos!")
+
+                    st.json(data)
+
+                else:
+                    st.error(f"Erro na API: {response.status_code}")
+                    st.text(response.text)
+
+            except Exception as e:
+                st.error("Erro ao conectar com o backend")
+                st.text(str(e))
