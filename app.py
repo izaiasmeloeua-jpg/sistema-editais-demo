@@ -1,62 +1,93 @@
 import streamlit as st
-import requests
 
-st.set_page_config(page_title="Sistema IA de Análise de Editais", layout="wide")
+st.set_page_config(page_title="Sistema IA de Editais", layout="wide")
 
-st.title("Sistema IA de Análise de Editais")
-st.markdown("Envie os documentos do edital para análise completa.")
+st.title("📊 Sistema IA de Análise de Editais")
+st.write("Envie os documentos do edital para análise completa.")
 
-# =========================
-# UPLOADS
-# =========================
-edital_file = st.file_uploader("1️⃣ Edital Principal (PDF)", type=["pdf"])
-tr_file = st.file_uploader("2️⃣ Termo de Referência (PDF)", type=["pdf"])
-documentos_complementares = st.file_uploader(
-    "3️⃣ Documentos Complementares (opcional)",
+# 1. EDITAL
+st.subheader("1️⃣ Edital (PDF) *obrigatório*")
+edital = st.file_uploader(
+    "Arraste ou selecione o EDITAL",
     type=["pdf"],
-    accept_multiple_files=True
+    key="edital"
 )
 
-# =========================
-# BOTÃO
-# =========================
-if st.button("Analisar edital"):
+# 2. TERMO DE REFERÊNCIA
+st.subheader("2️⃣ Termo de Referência (PDF) *obrigatório*")
+tr = st.file_uploader(
+    "Arraste ou selecione o TERMO DE REFERÊNCIA",
+    type=["pdf"],
+    key="tr"
+)
 
-    if not edital_file or not tr_file:
-        st.error("Envie o Edital e o Termo de Referência.")
-        st.stop()
+# 3. PONTUAÇÃO TÉCNICA
+st.subheader("3️⃣ Pontuação Técnica (PDF)")
+pontuacao = st.file_uploader(
+    "Arraste ou selecione documento de PONTUAÇÃO",
+    type=["pdf"],
+    key="pontuacao"
+)
 
-    # =========================
-    # MONTA MULTIPART
-    # =========================
-    files = []
+# 4. ESCOPO / PROJETO
+st.subheader("4️⃣ Escopo / Projeto (PDF)")
+escopo = st.file_uploader(
+    "Arraste ou selecione o ESCOPO",
+    type=["pdf"],
+    key="escopo"
+)
 
-    files.append(("file", (edital_file.name, edital_file, "application/pdf")))
-    files.append(("file", (tr_file.name, tr_file, "application/pdf")))
+# 5. MEMORIAL / ETP
+st.subheader("5️⃣ Memorial / ETP (PDF)")
+etp = st.file_uploader(
+    "Arraste ou selecione o ETP ou MEMORIAL",
+    type=["pdf"],
+    key="etp"
+)
 
-    if documentos_complementares:
-        for doc in documentos_complementares:
-            files.append(("file", (doc.name, doc, "application/pdf")))
+# 6. PLANILHAS / ORÇAMENTO
+st.subheader("6️⃣ Planilhas / Orçamento (PDF ou Excel)")
+orcamento = st.file_uploader(
+    "Arraste ou selecione PLANILHAS",
+    type=["pdf", "xlsx", "xls"],
+    key="orcamento"
+)
 
-    # =========================
-    # BACKEND
-    # =========================
-    url = "https://automacao-p1-295355359739.southamerica-east1.run.app/upload"
+# 7. CRONOGRAMA
+st.subheader("7️⃣ Cronograma (PDF)")
+cronograma = st.file_uploader(
+    "Arraste ou selecione o CRONOGRAMA",
+    type=["pdf"],
+    key="cronograma"
+)
 
-    with st.spinner("Processando análise..."):
-        try:
-            response = requests.post(url, files=files)
+# 8. OUTROS ANEXOS
+st.subheader("8️⃣ Outros Anexos")
+outros = st.file_uploader(
+    "Arraste ou selecione outros documentos",
+    type=["pdf"],
+    accept_multiple_files=True,
+    key="outros"
+)
 
-            try:
-                data = response.json()
-            except:
-                data = response.text
+st.markdown("---")
 
-            if response.status_code == 200:
-                st.success("Análise concluída com sucesso")
-                st.write(data)
-            else:
-                st.error(f"Erro no backend:\n{data}")
+if st.button("🚀 Analisar edital"):
+    if not edital or not tr:
+        st.error("Envie pelo menos o EDITAL e o TERMO DE REFERÊNCIA.")
+    else:
+        st.success("Arquivos recebidos com sucesso!")
 
-        except Exception as e:
-            st.error(f"Erro ao conectar com backend: {e}")
+        st.write("### 📂 Arquivos enviados:")
+        st.write("Edital:", edital.name if edital else None)
+        st.write("TR:", tr.name if tr else None)
+        st.write("Pontuação:", pontuacao.name if pontuacao else None)
+        st.write("Escopo:", escopo.name if escopo else None)
+        st.write("ETP:", etp.name if etp else None)
+        st.write("Orçamento:", orcamento.name if orcamento else None)
+        st.write("Cronograma:", cronograma.name if cronograma else None)
+
+        if outros:
+            st.write("Outros anexos:")
+            for f in outros:
+                st.write("-", f.name)
