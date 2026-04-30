@@ -18,14 +18,10 @@ def chamar_post(url, files=None):
             r = requests.post(url, timeout=1800)
         try:
             return r.status_code, r.json()
-        except:
+        except Exception:
             return r.status_code, r.text
     except Exception as e:
         return None, str(e)
-
-# ======================
-# UPLOAD
-# ======================
 
 st.subheader("📂 Upload dos arquivos")
 
@@ -45,20 +41,15 @@ arquivos_validos = [a for a in arquivos if a is not None]
 
 st.markdown("---")
 
-# ======================
-# BOTÃO PRINCIPAL
-# ======================
-
 if st.button("🚀 Analisar edital"):
     if not arquivos_validos:
         st.error("Envie pelo menos um arquivo.")
         st.stop()
 
     progress = st.progress(0)
-    status = st.empty()
+    status_box = st.empty()
 
-    # 1. Upload
-    status.write("📤 Enviando arquivos...")
+    status_box.write("📤 Enviando arquivos e criando edital...")
     files = [("file", (a.name, a, "application/pdf")) for a in arquivos_validos]
     code, data = chamar_post(f"{API_URL}/upload", files=files)
 
@@ -72,54 +63,92 @@ if st.button("🚀 Analisar edital"):
         edital_id = data.get("recordId") or data.get("airtable", {}).get("recordId")
 
     if not edital_id:
-        st.error("Não foi possível identificar o edital.")
+        st.error("Upload concluído, mas não foi possível identificar o edital.")
         st.write(data)
         st.stop()
 
     st.session_state.edital_id = edital_id
     progress.progress(20)
 
-    # 2. Itens
-    status.write("🧠 Gerando itens...")
-    chamar_post(f"{API_URL}/itens/{edital_id}")
+    status_box.write("🧠 Gerando itens do edital...")
+    code, data_itens = chamar_post(f"{API_URL}/itens/{edital_id}")
+    if code != 200:
+        st.error("Erro ao gerar itens")
+        st.write(data_itens)
+        st.stop()
     progress.progress(40)
 
-    # 3. Regras
-    status.write("⚙️ Gerando regras...")
-    chamar_post(f"{API_URL}/regras/{edital_id}")
+    status_box.write("⚙️ Gerando regras de análise...")
+    code, data_regras = chamar_post(f"{API_URL}/regras/{edital_id}")
+    if code != 200:
+        st.error("Erro ao gerar regras")
+        st.write(data_regras)
+        st.stop()
     progress.progress(60)
 
-    # 4. Match
-    status.write("🔗 Cruzando dados...")
-    chamar_post(f"{API_URL}/match/{edital_id}")
+    status_box.write("🔗 Cruzando requisitos com a base técnica...")
+    code, data_match = chamar_post(f"{API_URL}/match/{edital_id}")
+    if code != 200:
+        st.error("Erro ao rodar match")
+        st.write(data_match)
+        st.stop()
     progress.progress(80)
 
-    # 5. Score
-    status.write("📊 Calculando score...")
-    code, data = chamar_post(f"{API_URL}/score/{edital_id}")
+    status_box.write("📊 Calculando score e decisão estratégica...")
+    code, data_score = chamar_post(f"{API_URL}/score/{edital_id}")
+    if code != 200:
+        st.error("Erro ao calcular score")
+        st.write(data_score)
+        st.stop()
     progress.progress(100)
 
-    if code == 200:
-        st.success("✅ Análise concluída!")
+    status_box.empty()
+    st.success("✅ Análise concluída com sucesso!")
 
-        st.subheader("📌 Decisão Estratégica")
-        st.markdown(f"## {data.get('decisao_estrategica')}")
+    decisao = str(data_score.get("decisao_estrategica", "Análise concluída"))
+    score_atual = data_score.get("score_atual", 0)
+    score_maximo = data_score.get("score_maximo_possivel", 0)
+    potencial = data_score.get("potencial_fechamento", 0)
+    semaforo = str(data_score.get("semaforo", "")).upper()
+    recomendacao = data_score.get("recomendacao_ia", "")
+    resumo = data_score.get("resumo_executivo", "")
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Score Atual", data.get("score_atual"))
-        col2.metric("Score Máximo", data.get("score_maximo_possivel"))
-        col3.metric("Potencial", data.get("potencial_fechamento"))
+    st.markdown("---")
+    st.subheader("📌 Decisão Estratégica")
 
-        st.markdown("---")
-
-        st.subheader("🧠 Resumo Executivo")
-        st.write(data.get("resumo_executivo"))
-
-        st.markdown("---")
-
-        excel_url = f"{API_URL}/export/score/{edital_id}"
-        st.markdown(f"[📥 Baixar Relatório em Excel]({excel_url})")
-
+    if "NÃO" in decisao.upper():
+        st.error(f"🚫 {decisao}")
+    elif "PARCEIRO" in decisao.upper() or "REFORÇO" in decisao.upper():
+        st.warning(f"🤝 {decisao}")
     else:
-        st.error("Erro ao calcular score")
-        st.write(data)
+        st.success(f"✅ {decisao}")
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Score Atual", score_atual)
+    col2.metric("Score Máximo", score_maximo)
+    col3.metric("Potencial de Fechamento", potencial)
+    col4.metric("Semáforo", semaforo)
+
+    if recomendacao:
+        st.info(f"💡 {recomendacao}")
+
+    st.markdown("---")
+    st.subheader("🧠 Resumo Executivo")
+
+    if resumo:
+        st.markdown(
+            f"""
+            <div style="font-size:16px; line-height:1.7;">
+            {resumo.replace(chr(10), "<br>")}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.write("Resumo executivo não disponível.")
+
+    st.markdown("---")
+    st.subheader("📥 Exportação")
+
+    excel_url = f"{API_URL}/export/score/{edital_id}"
+    st.markdown(f"[📊 Baixar Relatório em Excel]({excel_url})")
